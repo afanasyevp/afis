@@ -1,5 +1,4 @@
 #!/home/pafanasyev/software/anaconda3/bin/python 
-#!/Applications/anaconda/bin/python
 
 ver=200410
 
@@ -218,7 +217,7 @@ the installed Anaconda's python
 Written and tested in python3.7
 
 Pavel Afanasyev
-afanasyev.p.v@gmail.com
+https://github.com/afanasyevp/afis.git
 ==================================================================================================
 
 ''' % ver 
