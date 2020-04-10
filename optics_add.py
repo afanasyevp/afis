@@ -52,11 +52,7 @@ def star_analyze(star_filename):
                 continue
             elif line[:4] == "_rln":
                 OpticsHeader[star_line[0]]=int(star_line[1][1:])
-                #if line[:16] == "_rlnOpticsGroup ": 
-                #    _rlnOpticsGroup_index=int(star_line[-1].split("#")[-1])
             elif line[:11]=="opticsGroup":
-                #print("opticsGroup found", (star_line))
-                #OpticsGroupData[star_line[0]]=star_line[(_rlnOpticsGroup_index-1)]
                 OpticsGroupData[star_line[0]]=line[:-1]
             elif line[:5] == "data_":
                 data_type=line[:-1].split("_")[1]
