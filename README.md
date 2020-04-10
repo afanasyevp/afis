@@ -1,8 +1,8 @@
 # Aberration-free image shift (AFIS) compensation for the EPU data
 
 Here two scripts and instructions for their use can be found:
-** optics_split.py ** finds optics group for each movie in your dataset
-** optics_add.py ** assigns optics group to each micrograph or particle from your dataset
+**optics_split.py** finds optics group for each movie in your dataset
+**optics_add.py** assigns optics group to each micrograph or particle from your dataset
 
 ### Splitting micrographs into optics groups
 You are welcome to use the script below. Here is a step-by-step instruction:
