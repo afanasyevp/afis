@@ -1,6 +1,6 @@
-#!/home/pafanasyev/software/anaconda3/bin/python 
+#!/Applications/anaconda/bin/python 
 
-ver=200410
+ver=200507
 
 import sys
 import os
@@ -41,10 +41,13 @@ def star_analyze(star_filename):
         lines=star_file.readlines()
     ## create OpticsHeader and OpticGroupData dictionary 
     for line in lines[:]:
+        #print(line)
         star_line=line.split()
+        #print("splitline:", star_line)
         if len(star_line) > 0:
             if line[:10] == "# version ":
                 OpticsHeader['# version']=star_line[2]
+                #print("version:", OpticsHeader['# version'])
             elif line[:5] == "loop_": 
                 continue
             elif line[:11]=="data_optics":
@@ -57,6 +60,7 @@ def star_analyze(star_filename):
             elif line[:5] == "data_":
                 data_type=line[:-1].split("_")[1]
                 #print("Data_%s found!" %data_type)
+                lines.pop(0)
                 break
             else:
                 continue
@@ -71,8 +75,8 @@ def star_analyze(star_filename):
                 MainHeader['# version']=star_line[2]
             elif line[:5] == "data_":
                 data_type=line[:-1].split("_")[1]
-                continue
                 #print("Data_%s found!" %data_type)
+                continue
             elif line[:5] == "loop_": 
                 continue
             elif line[:4] == "_rln":
@@ -141,9 +145,11 @@ def micrographs_write_optics(OpticsFileName, MainFileName, Output):
     reads in the a file with optics and without; writes out a new star-file.
     requires star_analyze
     '''
-    OpticsFile_MainHeader, OpticsGroupData, OpticsHeader, MoviesData, StarFileType = star_analyze(OpticsFileName)
-    MainFile_MainHeader, Main_OpticsGroupData, Main_OpticsHeader, MainFile_Data, MainFile_StarFileType = star_analyze(MainFileName)
 
+    #print("working on the %s file" % OpticsFileName) 
+    OpticsFile_MainHeader, OpticsGroupData, OpticsHeader, MoviesData, StarFileType = star_analyze(OpticsFileName)
+    #print("working on the %s file" % MainFileName)
+    MainFile_MainHeader, Main_OpticsGroupData, Main_OpticsHeader, MainFile_Data, MainFile_StarFileType = star_analyze(MainFileName)
     ##create a dictionary-helper to identify micrographs's group
     _rlnOpticsGroupInMovies_index=OpticsHeader['_rlnOpticsGroup']
     _rlnOpticsGroupInMain_index=MainFile_MainHeader['_rlnOpticsGroup']
@@ -183,7 +189,10 @@ loop_
         for k, v in sorted(MainFile_MainHeader.items(), key=lambda item: item[1]):
             outputFile.write("%s #%s \n" %(k, v))
         for k,v in MainFile_Data.items():
-            MainFile_Data[k][_rlnOpticsGroupInMain_index-1]=OpticsGroup[extract_moviename(k)]
+            try: 
+                MainFile_Data[k][_rlnOpticsGroupInMain_index-1]=OpticsGroup[extract_moviename(k)]
+            except KeyError:
+                print("WARNING!!!! %s movie is not found in the %s file and will be skipped! For this micrograph opticsGroup will not be modified! "%(extract_moviename(k), extract_moviename(k))) 
             for item in v: 
                 outputFile.write("%s " %item)
             outputFile.write("\n")
