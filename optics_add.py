@@ -1,6 +1,6 @@
 #!/Applications/anaconda/bin/python 
 
-ver=200507
+ver=210108
 
 import sys
 import os
@@ -19,24 +19,33 @@ output: FoilHole_14476491_Data_14478410_14478412_20191214_161005_fractions
     else: 
         return path 
 
-def extract_OpticsGroup(micrograph, OpticsGroup):
-    '''
-    finds and returns opticsgroup for a given micrograph
-    '''
-    result=OpticsGroup[extract_moviename(micrograph)]
-    return result
-
 def star_analyze(star_filename):
     '''
-    creates dicrionaries from the star files.
-    assumes for now version 3.1
+    creates dicrionaries from the star files: 
+        OpticsHeader: everything starting with _rlnXXXX, corresponding to the data_optics section
+        "# version 30001
+        data_optics
+        loop_
+        _rlnOpticsGroupName #1" etc
+
+        OpticsGroupData:  all the data after the previous section like:  
+        "opticsGroup1           1     0.43   300     2.7     0.1"
+        
+        MainHeader:  everything starting with _rlnXXXX, corresponding to the data_movies or data_particles section
+        "# version 30001
+        data_particles
+        loop_
+        _rlnCoordinateX #1"
+        
+        StarData:  main data (alignments data for particles.star) after the previous section like:   
+        "mov1.tiff 25" (movies.star) or "3.43 6.2 0.1 10 8.2 000001@Extract/job044/Micro/mov1.mrcs MotionCorr/job034 /Micro/mov1.mrc 1 0.1 6.1 6.4 44.8 0.0 1.0 0.0 " (particles.star)
     '''
     ## optics header dictionaries 
-    OpticsHeader={} 
+    OpticsHeader={}    
     OpticsGroupData={} 
     ## main header dictionaries
     MainHeader={}  
-    StarData={}
+    StarData={}    
     with open(star_filename, 'r') as star_file: 
         lines=star_file.readlines()
     ## create OpticsHeader and OpticGroupData dictionary 
@@ -57,6 +66,7 @@ def star_analyze(star_filename):
                 OpticsHeader[star_line[0]]=int(star_line[1][1:])
             elif line[:11]=="opticsGroup":
                 OpticsGroupData[star_line[0]]=line[:-1]
+                #print(OpticsGroupData)
             elif line[:5] == "data_":
                 data_type=line[:-1].split("_")[1]
                 #print("Data_%s found!" %data_type)
@@ -116,28 +126,43 @@ def star_analyze(star_filename):
     return MainHeader, OpticsGroupData, OpticsHeader, StarData, StarFileType
 
 def merge_optics_headers(header_1, header_2, data_1, data_2):
+    '''
+    Merges optics and data headers:
+    header_1: optics header from the movies (micrographs) file
+    header_2: particles optics-header from the particles file
+    data_1: optics group-data from the movies (micrographs) file
+    data_2: particles optics group-data (one line) from the particles file
+    '''
     data_merged={}
-    header_merged = {**header_1, **header_2}
-    indexes_of_values_to_add=[]
-    values_to_add='    '
-    for key, value in header_merged.items():
-        if key in header_1 and key in header_2:
-            if value == header_1[key]:
-                header_merged[key] = header_1[key]
-            else:
-                   print("WARNING!!! Optic header values of the micrographs- and particles- star files do not match! The new star file might be messed up!!!")
-        else:
-            indexes_of_values_to_add.append(int(value))
+    header_merged=header_1  # the optics header is taken from particles.star file 
+    #checks if the optics header movies.star contains anything extra to be included
+    new_indexes_of_extra_values=[]
+    old_indexes_of_extra_values=[]
+    extra_values_to_add=" "
     
-    for i in indexes_of_values_to_add:
-        values_to_add=values_to_add+(data_2['opticsGroup1'].split()[i-1]+ "    ") 
-    
-    for k,v in data_1.items():
-        data_merged[k]=v+values_to_add
+    for key in header_2:
+        if key not in header_1:
+            print("WARNING!!!!! Found an extra column in the particles-file, missing in micrographs-file: ", key, "\n This column and the corresponding values will be included in the output file" )
+            header_merged[key]=len(header_merged) #append the missing(extra) column, found in the movies file and missing in the particles file
+            new_indexes_of_extra_values.append(header_merged[key])
+            old_indexes_of_extra_values.append(header_2[key])
+    #print("new_indexes_of_extra_values", new_indexes_of_extra_values)
+    #print("old_indexes_of_extra_values", old_indexes_of_extra_values)
     #print("header_merged", header_merged)
-    #print("header_input", header_1)
+    if len(data_2)==1: 
+        #convert data_2 dictionary with a sigle entry to a list and picking the right values to include into the new data_merged:
+        data_2_value=str(*data_2.values()).split()
+        for i in old_indexes_of_extra_values:
+            extra_values_to_add=extra_values_to_add+str(data_2_value[i-1])+"   "
+    else:
+        print("ERROR: particles.star file already contains multiple OpticsGroups or none. You might consider deleting them manually and leaving a single one")
+        sys.exit(2) 
+    #print("extra_values_to_add", extra_values_to_add)
+    
+    #actual merging of the optics data:
+    for k,v in data_1.items():
+        data_merged[k]=v+extra_values_to_add
     return header_merged, data_merged
-
 
 
 def micrographs_write_optics(OpticsFileName, MainFileName, Output):
@@ -146,12 +171,12 @@ def micrographs_write_optics(OpticsFileName, MainFileName, Output):
     requires star_analyze
     '''
 
-    #print("working on the %s file" % OpticsFileName) 
+    print("working on %s file" % OpticsFileName, "\n") 
     OpticsFile_MainHeader, OpticsGroupData, OpticsHeader, MoviesData, StarFileType = star_analyze(OpticsFileName)
-    #print("working on the %s file" % MainFileName)
+    print("working on %s file" % MainFileName, "\n")
     MainFile_MainHeader, Main_OpticsGroupData, Main_OpticsHeader, MainFile_Data, MainFile_StarFileType = star_analyze(MainFileName)
     ##create a dictionary-helper to identify micrographs's group
-    _rlnOpticsGroupInMovies_index=OpticsHeader['_rlnOpticsGroup']
+    _rlnOpticsGroupInMovies_index=OpticsFile_MainHeader['_rlnOpticsGroup']
     _rlnOpticsGroupInMain_index=MainFile_MainHeader['_rlnOpticsGroup']
     OpticsGroup={}
     for k,v in MoviesData.items():
@@ -166,9 +191,7 @@ def micrographs_write_optics(OpticsFileName, MainFileName, Output):
 
         outputFile.write('''
 # version %s
-
 data_optics
-
 loop_ 
 ''' %OpticsHeader['# version'])
         OpticsHeader_output.pop("# version")
@@ -178,11 +201,8 @@ loop_
         for k, v in sorted(OpticsGroupData_output.items(), key=lambda item: item[1][1]):
             outputFile.write("%s\n" %v) 
         outputFile.write('''
-
 # version %s
-
 data_%s
-
 loop_ 
 ''' %(Main_OpticsHeader['# version'],  MainFile_StarFileType))
         MainFile_MainHeader.pop("# version")
@@ -192,7 +212,7 @@ loop_
             try: 
                 MainFile_Data[k][_rlnOpticsGroupInMain_index-1]=OpticsGroup[extract_moviename(k)]
             except KeyError:
-                print("WARNING!!!! %s movie is not found in the %s file and will be skipped! For this micrograph opticsGroup will not be modified! "%(extract_moviename(k), extract_moviename(k))) 
+                print("WARNING!!!! %s movie is not found in the %s file and will be skipped! For this micrograph opticsGroup will not be modified! "%(extract_moviename(k), OpticsFileName)) 
             for item in v: 
                 outputFile.write("%s " %item)
             outputFile.write("\n")
@@ -201,30 +221,24 @@ loop_
     
 def main():
     output_text='''
-
 ========================================= optics_add.py ==========================================
 optics_add.py modifies the micrographs_ctf.star file by assigning each micrograph
 to its opticsGroup. 
-
 Note:
  - The input mmovies.star file must contain optics groups (please run optics_split)
  - The program works with files from Relion 3.1 version
  - Movie-names cannot contain more than one "." in filename (only in front of the file extension)
  - In case --part option is used, assumed only only one optics group in the particle.star file
  Only particles before CTF-refinement can be used.
-
 How to install and run:   
- - Download and install the latest Anaconda with python 3.7
+ - Download and install the latest Anaconda with python 3.6 or later
  - Modify the first line of the script to change the location of the python execultable to 
 the installed Anaconda's python 
-
 [version %s]
-Written and tested in python3.7
-
+Written and tested in python3.6
 Pavel Afanasyev
 https://github.com/afanasyevp/afis/
 ==================================================================================================
-
 ''' % ver 
 
     parser = argparse.ArgumentParser(description="")
