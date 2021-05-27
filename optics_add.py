@@ -250,7 +250,7 @@ https://github.com/afanasyevp/afis/
     args = parser.parse_args()
     print(output_text)
     parser.print_help()
-    print("Example: optics_add.py --mov ./movies.star --microgr ./micrographs_ctf.star --o microghraphs_ctf_optics.star")
+    print("Example: optics_add.py --mov ./movies.star --micro ./micrographs_ctf.star --o microghraphs_ctf_optics.star")
     print(" ")
     #print(args.mov)
     if len(sys.argv) == 1:
